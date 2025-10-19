@@ -1,0 +1,44 @@
+/* GetStream Chat Custom Styles */
+
+/* Customize chat colors to match your app theme */
+.str-chat__channel {
+  background: linear-gradient(to bottom right, #fdf4ff, #fce7f3) !important;
+}
+
+.str-chat__message--me .str-chat__message-simple-text-inner {
+  background: linear-gradient(to right, #a855f7, #ec4899) !important;
+  color: white !important;
+}
+
+.str-chat__message:not(.str-chat__message--me) .str-chat__message-simple-text-inner {
+  background: white !important;
+  border: 2px solid #e9d5ff !important;
+}
+
+.str-chat__input-flat {
+  background: white !important;
+  border: 2px solid #e9d5ff !important;
+  border-radius: 1rem !important;
+}
+
+.str-chat__input-flat:focus-within {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1) !important;
+}
+
+.str-chat__send-button {
+  background: linear-gradient(to right, #a855f7, #ec4899) !important;
+  border-radius: 0.75rem !important;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .str-chat__channel-header {
+    padding: 0.75rem !important;
+  }
+  
+  .str-chat__message-simple-text-inner {
+    font-size: 0.875rem !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+}
