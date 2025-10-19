@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { StreamChat } from 'stream-chat';
 import { Chat, Channel, ChannelHeader, MessageInput, MessageList, Thread, Window } from 'stream-chat-react';
 import 'stream-chat-react/dist/css/v2/index.css';
+import './chat-custom.css';
 import { STREAM_API_KEY, chatUsers, CHANNEL_ID, CHANNEL_NAME } from './chatConfig';
+import ThemeSwitcher from './ThemeSwitcher';
+import QuickActions from './QuickActions';
+import SmartNotifications from './SmartNotifications';
+import { getTheme, loadTheme } from './themes';
 
 // Initialize Stream Chat client
 let chatClient = null;
@@ -20,10 +25,17 @@ const App = () => {
   const [showChat, setShowChat] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showCommonSlots, setShowCommonSlots] = useState(false);
+  
+  // Theme state
+  const [currentTheme, setCurrentTheme] = useState(loadTheme());
+  
+  // Get theme configuration
+  const theme = getTheme(currentTheme);
 
   // Fixed credentials for users
   const users = {
@@ -57,6 +69,15 @@ const App = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Reset unread count when chat is opened
+  useEffect(() => {
+    if (showChat && channel) {
+      setUnreadCount(0);
+      // Mark all messages as read
+      channel.markRead().catch(console.error);
+    }
+  }, [showChat, channel]);
 
   // Initialize GetStream Chat
   const initializeChat = async (userId) => {
@@ -140,6 +161,19 @@ const App = () => {
 
       await channelInstance.watch();
       setChannel(channelInstance);
+      
+      // Get initial unread count
+      const unreadMessages = channelInstance.countUnread();
+      setUnreadCount(unreadMessages);
+      
+      // Listen for new messages to update unread count
+      channelInstance.on('message.new', (event) => {
+        // Only count if chat is not visible and message is not from current user
+        if (!showChat && event.user?.id !== userId) {
+          setUnreadCount(prev => prev + 1);
+        }
+      });
+      
       setChatLoading(false);
     } catch (error) {
       console.error('Chat initialization error:', error);
@@ -196,9 +230,22 @@ const App = () => {
       setShowChat(false);
       setChatError('');
       setChatLoading(false);
+      setUnreadCount(0);
       
       // Clear localStorage
       localStorage.removeItem('loggedInUser');
+    }
+  };
+
+  // Scroll to chat section
+  const scrollToChat = () => {
+    const chatSection = document.getElementById('chatSection');
+    if (chatSection) {
+      chatSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Open chat if not already open
+      if (!showChat) {
+        setTimeout(() => setShowChat(true), 500);
+      }
     }
   };
 
@@ -489,24 +536,59 @@ const App = () => {
 
   // Main App (rest of your timetable UI stays the same)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 px-2 py-4 md:px-4 md:py-8">
+    <div className="min-h-screen px-2 py-4 md:px-4 md:py-8" style={{ background: theme.background }}>
+      {/* Theme Switcher */}
+      <ThemeSwitcher currentTheme={currentTheme} onThemeChange={setCurrentTheme} />
+      
+      {/* Smart Notifications */}
+      <SmartNotifications 
+        currentUser={currentUser}
+        friends={Object.keys(timetable)}
+        timetable={timetable}
+        currentTime={currentTime}
+      />
+      
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border-2 md:border-4 border-purple-200">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 mb-2">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-2"
+                style={{ color: theme.primaryText }}>
                 Friends Timetable 📚
               </h1>
-              <p className="text-gray-600 text-sm md:text-xl font-medium">
+              <p className="text-sm md:text-xl font-medium"
+                style={{ color: theme.secondaryText }}>
                 Track your squad's schedule in real-time! ⏰
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
-              <div className="px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl md:rounded-2xl font-bold shadow-lg text-sm md:text-base">
-                <span className="mr-2">{friendInfo[currentUser]?.emoji}</span>
-                Welcome, {currentUser}!
+              <div className="flex items-center gap-3">
+                <div className="px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl md:rounded-2xl font-bold shadow-lg text-sm md:text-base">
+                  <span className="mr-2">{friendInfo[currentUser]?.emoji}</span>
+                  Welcome, {currentUser}!
+                </div>
+                
+                {/* Message Icon with Badge */}
+                <button
+                  onClick={scrollToChat}
+                  className="relative px-3 md:px-4 py-2 md:py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl md:rounded-2xl font-bold shadow-lg transition-all hover:scale-105 active:scale-95"
+                  title="Go to messages"
+                >
+                  <span className="text-xl md:text-2xl">💬</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 border-2 border-white shadow-lg animate-pulse">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
               </div>
+              
               <button
                 onClick={handleLogout}
                 className="px-4 md:px-6 py-2 md:py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl md:rounded-2xl font-bold transition-colors shadow-lg text-sm md:text-base w-full sm:w-auto"
@@ -538,8 +620,14 @@ const App = () => {
 
       {/* Current Availability */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border-2 md:border-4 border-purple-200">
-          <h2 className="text-2xl md:text-4xl font-bold mb-4 md:mb-6 text-gray-800 flex items-center gap-2 md:gap-3">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
+          <h2 className="text-2xl md:text-4xl font-bold mb-4 md:mb-6 flex items-center gap-2 md:gap-3"
+            style={{ color: theme.primaryText }}>
             <span className="text-2xl md:text-4xl">👥</span>
             Friend Status Right Now
           </h2>
@@ -620,8 +708,14 @@ const App = () => {
 
       {/* Day Selector */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border-2 md:border-4 border-purple-200">
-          <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-gray-800 flex items-center gap-2">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
+          <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 flex items-center gap-2"
+            style={{ color: theme.primaryText }}>
             <span className="text-2xl md:text-3xl">📅</span>
             Select Day
           </h2>
@@ -645,7 +739,12 @@ const App = () => {
 
       {/* Common Free Slots Toggle */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border-2 md:border-4 border-purple-200">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -700,8 +799,14 @@ const App = () => {
 
       {/* Timetable Grid */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border-2 md:border-4 border-purple-200">
-          <h2 className="text-2xl md:text-4xl font-bold mb-4 md:mb-6 text-gray-800 flex items-center gap-2 md:gap-3">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
+          <h2 className="text-2xl md:text-4xl font-bold mb-4 md:mb-6 flex items-center gap-2 md:gap-3"
+            style={{ color: theme.primaryText }}>
             <span className="text-2xl md:text-4xl">📋</span>
             {selectedDay}'s Schedule
           </h2>
@@ -758,7 +863,12 @@ const App = () => {
 
       {/* GetStream Chat Section */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8" id="chatSection">
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-purple-200 overflow-hidden">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl border overflow-hidden" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
           {/* Chat Header */}
           <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 p-4 md:p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -811,18 +921,33 @@ const App = () => {
 
               {/* Chat Interface */}
               {channel && !chatLoading && (
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl md:rounded-2xl border-2 md:border-4 border-purple-200 overflow-hidden">
-                  <Chat client={chatClient} theme="messaging light">
-                    <Channel channel={channel}>
-                      <Window>
-                        <ChannelHeader />
-                        <MessageList />
-                        <MessageInput />
-                      </Window>
-                      <Thread />
-                    </Channel>
-                  </Chat>
-                </div>
+                <>
+                  {/* Quick Actions */}
+                  <QuickActions channel={channel} currentUser={currentUser} />
+                  
+                  <div 
+                    className="rounded-xl md:rounded-2xl overflow-hidden mt-4 relative"
+                    style={{ 
+                      height: '600px', 
+                      maxHeight: '70vh',
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%)',
+                      boxShadow: '0 20px 60px rgba(168, 85, 247, 0.2), 0 10px 30px rgba(236, 72, 153, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                      border: '2px solid rgba(168, 85, 247, 0.2)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <Chat client={chatClient} theme="messaging light">
+                      <Channel channel={channel}>
+                        <Window>
+                          <ChannelHeader />
+                          <MessageList />
+                          <MessageInput />
+                        </Window>
+                        <Thread />
+                      </Channel>
+                    </Chat>
+                  </div>
+                </>
               )}
 
               {/* Info Banner */}
