@@ -1,7 +1,8 @@
-// GetStream Chat Configuration
+// GetStream Chat & Video Configuration
 // Get your API key from: https://getstream.io/dashboard/
 
-export const STREAM_API_KEY = 'vpkg2fqsb6aq'; // You'll need to get this from GetStream
+export const STREAM_API_KEY = 'vpkg2fqsb6aq'; // Chat API Key
+export const STREAM_VIDEO_API_KEY = 'vpkg2fqsb6aq'; // Video API Key (usually same as chat)
 
 // User configuration
 export const chatUsers = {

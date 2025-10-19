@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { StreamChat } from 'stream-chat';
 import { Chat, Channel, ChannelHeader, MessageInput, MessageList, Thread, Window } from 'stream-chat-react';
+import { StreamVideoClient } from '@stream-io/video-react-sdk';
 import 'stream-chat-react/dist/css/v2/index.css';
-import { STREAM_API_KEY, chatUsers, CHANNEL_ID, CHANNEL_NAME } from './chatConfig';
+import { STREAM_API_KEY, STREAM_VIDEO_API_KEY, chatUsers, CHANNEL_ID, CHANNEL_NAME } from './chatConfig';
+import VideoCallComponent from './VideoCallComponent';
 
 // Initialize Stream Chat client
 let chatClient = null;
+let videoClient = null;
 
 const App = () => {
   // Login states
@@ -20,6 +23,11 @@ const App = () => {
   const [showChat, setShowChat] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
+
+  // Video call states
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [videoCallId, setVideoCallId] = useState(null);
+  const [videoCallType, setVideoCallType] = useState('audio'); // 'audio' or 'default' (video)
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState('Monday');
@@ -131,6 +139,19 @@ const App = () => {
         );
       }
 
+      // Initialize Video Client
+      if (!videoClient) {
+        videoClient = new StreamVideoClient({
+          apiKey: STREAM_VIDEO_API_KEY,
+          user: {
+            id: userId,
+            name: userConfig.name,
+            image: userConfig.image,
+          },
+          token: userToken,
+        });
+      }
+
       // Create or get the channel
       const channelInstance = chatClient.channel('messaging', CHANNEL_ID, {
         name: CHANNEL_NAME,
@@ -156,9 +177,16 @@ const App = () => {
         await chatClient.disconnectUser();
         chatClient = null; // Reset client to null
       }
+      
+      // Disconnect video client
+      if (videoClient) {
+        await videoClient.disconnectUser();
+        videoClient = null;
+      }
     } catch (error) {
       console.error('Disconnect error:', error);
       chatClient = null; // Reset anyway
+      videoClient = null;
       setChannel(null);
     }
   };
@@ -194,12 +222,35 @@ const App = () => {
       setIsLoggedIn(false);
       setCurrentUser(null);
       setShowChat(false);
+      setShowVideoCall(false);
       setChatError('');
       setChatLoading(false);
       
       // Clear localStorage
       localStorage.removeItem('loggedInUser');
     }
+  };
+
+  // Start video call
+  const startVideoCall = () => {
+    const callId = `friends-video-${Date.now()}`;
+    setVideoCallId(callId);
+    setVideoCallType('default'); // 'default' = video call
+    setShowVideoCall(true);
+  };
+
+  // Start audio call
+  const startAudioCall = () => {
+    const callId = `friends-audio-${Date.now()}`;
+    setVideoCallId(callId);
+    setVideoCallType('audio'); // 'audio' = audio only
+    setShowVideoCall(true);
+  };
+
+  // Close video call
+  const closeVideoCall = () => {
+    setShowVideoCall(false);
+    setVideoCallId(null);
   };
 
   // Friend information for enhanced display
@@ -771,12 +822,33 @@ const App = () => {
                   Powered by GetStream - Messages sync instantly! ⚡
                 </p>
               </div>
-              <button
-                onClick={() => setShowChat(!showChat)}
-                className="px-4 py-2 md:px-6 md:py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold transition-colors border-2 border-white/30 text-sm md:text-base w-full md:w-auto"
-              >
-                {showChat ? '▼ Hide Chat' : '▶ Show Chat'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                {/* Video Call Button */}
+                <button
+                  onClick={startVideoCall}
+                  className="px-4 py-2 md:px-6 md:py-3 bg-green-500/80 hover:bg-green-600 text-white rounded-xl font-bold transition-all border-2 border-white/30 text-sm md:text-base flex items-center justify-center gap-2 backdrop-blur-sm hover:scale-105"
+                  title="Start Video Call"
+                >
+                  <span className="text-xl">📹</span>
+                  Video
+                </button>
+                {/* Audio Call Button */}
+                <button
+                  onClick={startAudioCall}
+                  className="px-4 py-2 md:px-6 md:py-3 bg-blue-500/80 hover:bg-blue-600 text-white rounded-xl font-bold transition-all border-2 border-white/30 text-sm md:text-base flex items-center justify-center gap-2 backdrop-blur-sm hover:scale-105"
+                  title="Start Audio Call"
+                >
+                  <span className="text-xl">📞</span>
+                  Audio
+                </button>
+                {/* Toggle Chat Button */}
+                <button
+                  onClick={() => setShowChat(!showChat)}
+                  className="px-4 py-2 md:px-6 md:py-3 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold transition-colors border-2 border-white/30 text-sm md:text-base"
+                >
+                  {showChat ? '▼ Hide' : '▶ Show'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -856,6 +928,31 @@ const App = () => {
           )}
         </div>
       </div>
+
+      {/* Video/Audio Call Modal */}
+      {showVideoCall && videoClient && videoCallId && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full h-full max-w-6xl max-h-[90vh] bg-gradient-to-br from-purple-900 to-pink-900 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/20">
+            {/* Close Button */}
+            <div className="absolute top-4 right-4 z-50">
+              <button
+                onClick={closeVideoCall}
+                className="px-4 py-2 bg-red-500/80 hover:bg-red-600 text-white rounded-xl font-bold transition-all shadow-lg border-2 border-white/30 backdrop-blur-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            {/* Video Call Component */}
+            <VideoCallComponent
+              videoClient={videoClient}
+              callId={videoCallId}
+              callType={videoCallType}
+              onClose={closeVideoCall}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="mt-8 md:mt-16 text-center pb-6 md:pb-8">
