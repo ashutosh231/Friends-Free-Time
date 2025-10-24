@@ -398,6 +398,146 @@
   .str-chat__list {
     max-height: calc(70vh - 120px) !important;
   }
+
+  /* ======================
+     Cartoon / Friendship UI
+     ====================== */
+  .cartoon-timetable-wrapper {
+    font-family: 'Comic Sans MS', 'Comic Neue', 'Fredoka', 'Baloo 2', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(180deg, #fff9f2 0%, #fff6fb 50%, #f2f9ff 100%);
+    border: 6px dashed rgba(255, 160, 122, 0.18);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08), 0 6px 18px rgba(255, 165, 110, 0.06) inset;
+    transform: rotate(-0.3deg);
+    position: relative;
+    overflow: visible;
+  }
+
+  .cartoon-timetable {
+    border-spacing: 12px;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='6' cy='6' r='2' fill='%23FFD7D0' opacity='0.35'/></svg>") repeat;
+    border-radius: 18px;
+    padding: 10px;
+  }
+
+  .cartoon-timetable th {
+    border-radius: 12px;
+    border: 3px solid rgba(255,255,255,0.9) !important;
+    box-shadow: 0 8px 24px rgba(255, 183, 77, 0.12);
+    transform: rotate(-0.5deg);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.6);
+  }
+
+  .cartoon-timetable td {
+    border-radius: 12px;
+    padding: 14px !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,250,240,0.9));
+    box-shadow: 0 10px 20px rgba(255, 183, 77, 0.08);
+    border: 2px solid rgba(255, 200, 160, 0.6) !important;
+    position: relative;
+  }
+
+  .cartoon-timetable td .emoji-sticker {
+    position: absolute;
+    right: 8px;
+    top: 6px;
+    font-size: 18px;
+    transform-origin: center;
+    animation: sticker-bounce 3s ease-in-out infinite;
+  }
+
+  @keyframes sticker-bounce {
+    0%,100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-6px) rotate(-6deg); }
+  }
+
+  .cartoon-timetable thead th:first-child { transform: rotate(-1deg); }
+
+  /* playful captions */
+  .cartoon-timetable td .time-caption {
+    font-size: 11px;
+    color: #8b5cf6;
+    font-weight: 700;
+  }
+
+  /* Cartoon chat wrapper */
+  .cartoon-chat-wrapper {
+    font-family: 'Baloo 2', 'Fredoka', 'Comic Sans MS', 'Segoe UI', Roboto, Arial, sans-serif;
+    overflow: visible;
+  }
+
+  .cartoon-chat-wrapper .str-chat__channel {
+    background: linear-gradient(135deg, #fffbeb 0%, #fff7ff 50%, #e6f7ff 100%) !important;
+    border-radius: 28px !important;
+    padding: 12px !important;
+    box-shadow: 0 30px 60px rgba(168,85,247,0.08), inset 0 2px 10px rgba(255,255,255,0.6) !important;
+  }
+
+  /* Speech-bubble tails for messages */
+  .cartoon-chat-wrapper .str-chat__message-simple-text-inner {
+    position: relative !important;
+    border-radius: 18px !important;
+  }
+
+  .cartoon-chat-wrapper .str-chat__message--me .str-chat__message-simple-text-inner::after,
+  .cartoon-chat-wrapper .str-chat__message:not(.str-chat__message--me) .str-chat__message-simple-text-inner::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    width: 18px;
+    height: 18px;
+    background: inherit;
+    transform: rotate(45deg);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+    z-index: 0;
+  }
+
+  .cartoon-chat-wrapper .str-chat__message--me .str-chat__message-simple-text-inner::after { right: 18px; }
+  .cartoon-chat-wrapper .str-chat__message:not(.str-chat__message--me) .str-chat__message-simple-text-inner::after { left: 18px; }
+
+  /* Floating heart sticker */
+  .cartoon-chat-wrapper::before {
+    content: '💖';
+    position: absolute;
+    right: 24px;
+    top: -18px;
+    font-size: 48px;
+    opacity: 0.12;
+    transform: rotate(-12deg);
+    pointer-events: none;
+    animation: float-slow 6s ease-in-out infinite;
+  }
+
+  @keyframes float-slow {
+    0% { transform: translateY(0) rotate(-12deg); }
+    50% { transform: translateY(-10px) rotate(-6deg); }
+    100% { transform: translateY(0) rotate(-12deg); }
+  }
+
+  /* Button wiggle */
+  .cartoon-chat-wrapper .px-4.py-2, .cartoon-chat-wrapper button {
+    transition: transform 0.18s ease;
+  }
+
+  .cartoon-chat-wrapper button:hover { transform: translateY(-3px) rotate(-2deg); }
+
+  /* Make message bubbles more cartoon-like */
+  .cartoon-chat-wrapper .str-chat__message--me .str-chat__message-simple-text-inner {
+    filter: drop-shadow(0 8px 18px rgba(238, 99, 161, 0.12));
+  }
+
+  .cartoon-chat-wrapper .str-chat__message:not(.str-chat__message--me) .str-chat__message-simple-text-inner {
+    filter: drop-shadow(0 6px 14px rgba(99, 102, 241, 0.08));
+  }
+
+  /* playful quick actions area */
+  .cartoon-chat-wrapper .quick-action-badge {
+    background: linear-gradient(90deg, #fff2f0, #fff9f2);
+    border: 2px solid rgba(255, 160, 122, 0.25);
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(255, 183, 77, 0.08);
+    font-weight: 800;
+  }
   
   .str-chat__input-flat {
     margin: 0.75rem !important;

@@ -31,6 +31,25 @@ const App = () => {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showCommonSlots, setShowCommonSlots] = useState(false);
   
+  // State for marking slots as free/unavailable
+  const [markedFreeSlots, setMarkedFreeSlots] = useState(() => {
+    const saved = localStorage.getItem('markedFreeSlots');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
+  // State for marking class slots as cancelled/free
+  const [cancelledClassSlots, setCancelledClassSlots] = useState(() => {
+    const saved = localStorage.getItem('cancelledClassSlots');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
+  // Notification states
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    const saved = localStorage.getItem('notificationsEnabled');
+    return saved ? JSON.parse(saved) : true;
+  });
+  
   // Theme state
   const [currentTheme, setCurrentTheme] = useState(loadTheme());
   
@@ -54,6 +73,9 @@ const App = () => {
       initializeChat(userData.name.toLowerCase());
     }
     
+    // Request notification permission
+    requestNotificationPermission();
+    
     // Cleanup on component unmount
     return () => {
       if (chatClient && chatClient.userID) {
@@ -61,6 +83,45 @@ const App = () => {
       }
     };
   }, []);
+
+  // Request notification permission
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    }
+  };
+
+  // Send notification function
+  const sendNotification = (title, body, icon = null) => {
+    if (!notificationsEnabled || notificationPermission !== 'granted') return;
+    
+    const notification = new Notification(title, {
+      body,
+      icon: icon || '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'timetable-update',
+      requireInteraction: true
+    });
+    
+    // Auto close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
+  };
+
+  // Send chat notification about timetable changes
+  const sendChatNotification = async (message) => {
+    if (channel && currentUser) {
+      try {
+        await channel.sendMessage({
+          text: message,
+          type: 'system',
+          user: { id: 'system', name: 'Timetable Bot' }
+        });
+      } catch (error) {
+        console.error('Failed to send chat notification:', error);
+      }
+    }
+  };
 
   // Update time every second for live clock
   useEffect(() => {
@@ -267,107 +328,203 @@ const App = () => {
 
   // Timetable data for friends - All time slots must match for proper table display
   const timetable = {
-    'Ashutosh': {
-      Monday: [
-        { time: '9:00-10:00', subject: 'PEV301 (T)', type: 'class' },
-        { time: '10:00-11:00', subject: 'PEV301 (T)', type: 'class' },
-        { time: '11:00-12:00', subject: 'Free', type: 'free' },
-        { time: '12:00-1:00', subject: 'PEV301 (L)', type: 'class' },
-        { time: '1:00-2:00', subject: 'PEV301 (L)', type: 'class' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'PEAS05 (L)', type: 'class' },
-        { time: '4:00-5:00', subject: 'PEAS05 (L)', type: 'class' },
-      ],
-      Tuesday: [
-        { time: '9:00-10:00', subject: 'Free', type: 'free' },
-        { time: '10:00-11:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '12:00-1:00', subject: 'IXD801 (P)', type: 'class' },
-        { time: '1:00-2:00', subject: 'Free', type: 'free' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Wednesday: [
-        { time: '9:00-10:00', subject: 'Free', type: 'free' },
-        { time: '10:00-11:00', subject: 'INT222 (L)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT222 (L)', type: 'class' },
-        { time: '12:00-1:00', subject: 'IXD801 (P)', type: 'class' },
-        { time: '1:00-2:00', subject: 'Free', type: 'free' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Thursday: [
-        { time: '9:00-10:00', subject: 'INT252 (P)', type: 'class' },
-        { time: '10:00-11:00', subject: 'INT252 (P)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT252 (P)', type: 'class' },
-        { time: '12:00-1:00', subject: 'IXD801 (P)', type: 'class' },
-        { time: '1:00-2:00', subject: 'Free', type: 'free' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Friday: [
-        { time: '9:00-10:00', subject: 'INT222 (P)', type: 'class' },
-        { time: '10:00-11:00', subject: 'INT222 (P)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT222 (P)', type: 'class' },
-        { time: '12:00-1:00', subject: 'Free', type: 'free' },
-        { time: '1:00-2:00', subject: 'Free', type: 'free' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-    },
+    "Ashutosh": {
+  "Monday": [
+    { "time": "9:00-10:00", "subject": "PEV301 (T)", "room": "33-601", "faculty": "K23TA", "type": "class" },
+    { "time": "10:00-11:00", "subject": "PEV301 (T)", "room": "33-601", "faculty": "K23TA", "type": "class" },
+    { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "12:00-1:00", "subject": "PEV301 (L)", "room": "33-601", "faculty": "K23TA", "type": "class" },
+    { "time": "1:00-2:00", "subject": "PEV301 (L)", "room": "33-601", "faculty": "K23TA", "type": "class" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Tuesday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "10:00-11:00", "subject": "INT252 (L)", "room": "33-505X", "faculty": "KM008", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT252 (L)", "room": "33-505X", "faculty": "KM008", "type": "class" },
+    { "time": "12:00-1:00", "subject": "IXD801 (P)", "room": "37-902", "faculty": "KO130", "type": "class" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Wednesday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "10:00-11:00", "subject": "INT222 (L)", "room": "33-504", "faculty": "KM008", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT222 (L)", "room": "33-504", "faculty": "KM008", "type": "class" },
+    { "time": "12:00-1:00", "subject": "IXD801 (P)", "room": "37-902", "faculty": "KO130", "type": "class" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Thursday": [
+    { "time": "9:00-10:00", "subject": "INT252 (P)", "room": "33-503", "faculty": "KM008", "type": "class" },
+    { "time": "10:00-11:00", "subject": "INT252 (P)", "room": "33-503", "faculty": "KM008", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT252 (P)", "room": "33-503", "faculty": "KM008", "type": "class" },
+    { "time": "12:00-1:00", "subject": "IXD801 (P)", "room": "37-902", "faculty": "KO130", "type": "class" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "PEAS05 (L)", "room": "34-704", "faculty": "9R777", "type": "class" },
+    { "time": "3:00-4:00", "subject": "PEAS05 (L)", "room": "36-903", "faculty": "9R777", "type": "class" }
+  ],
+  "Friday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "Free" },
+    { "time": "10:00-11:00", "subject": "INT222 (P)", "room": "33-505", "faculty": "KM008", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT222 (P)", "room": "33-505", "faculty": "KM008", "type": "class" },
+    { "time": "12:00-1:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ]
+},
     
-    'Dhruv': {
-      Monday: [
-        { time: '9:00-10:00', subject: 'Free', type: 'free' },
-        { time: '10:00-11:00', subject: 'PEV301 (T)', type: 'class' },
-        { time: '11:00-12:00', subject: 'PEV301 (T)', type: 'class' },
-        { time: '12:00-1:00', subject: 'PEAS05 (L)', type: 'class' },
-        { time: '1:00-2:00', subject: 'Free', type: 'free' },
-        { time: '2:00-3:00', subject: 'PEAS05 (L)', type: 'class' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-        { time: '4:00-5:00', subject: 'Free', type: 'free' },
-      ],
-      Tuesday: [
-        { time: '9:00-10:00', subject: 'INT222 (P)', type: 'class' },
-        { time: '10:00-11:00', subject: 'INT222 (P)', type: 'class' },
-        { time: '11:00-12:00', subject: 'Free', type: 'free' },
-        { time: '12:00-1:00', subject: 'Free', type: 'free' },
-        { time: '1:00-2:00', subject: 'PSY291 (L)', type: 'class' },
-        { time: '2:00-3:00', subject: 'PEV301 (L)', type: 'class' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Wednesday: [
-        { time: '9:00-10:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '10:00-11:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '12:00-1:00', subject: 'Free', type: 'free' },
-        { time: '1:00-2:00', subject: 'PSY291 (L)', type: 'class' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Thursday: [
-        { time: '9:00-10:00', subject: 'INT222 (L)', type: 'class' },
-        { time: '10:00-11:00', subject: 'INT252 (L)', type: 'class' },
-        { time: '11:00-12:00', subject: 'Free', type: 'free' },
-        { time: '12:00-1:00', subject: 'Free', type: 'free' },
-        { time: '1:00-2:00', subject: 'PSY291 (L)', type: 'class' },
-        { time: '2:00-3:00', subject: 'PEV301 (L)', type: 'class' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-      Friday: [
-        { time: '9:00-10:00', subject: 'Free', type: 'free' },
-        { time: '10:00-11:00', subject: 'INT252 (P)', type: 'class' },
-        { time: '11:00-12:00', subject: 'INT252 (P)', type: 'class' },
-        { time: '12:00-1:00', subject: 'Free', type: 'free' },
-        { time: '1:00-2:00', subject: 'PSY291 (L)', type: 'class' },
-        { time: '2:00-3:00', subject: 'Free', type: 'free' },
-        { time: '3:00-4:00', subject: 'Free', type: 'free' },
-      ],
-    },
+    "Dhruv": {
+  "Monday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "10:00-11:00", "subject": "PEV301 (T)", "room": "36-909", "faculty": "K23EU", "type": "class" },
+    { "time": "11:00-12:00", "subject": "PEV301 (T)", "room": "36-909", "faculty": "K23EU", "type": "class" },
+    { "time": "12:00-1:00", "subject": "PEAS05 (L)", "room": "37-806", "faculty": "9R846", "type": "class" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "PEAS05 (L)", "room": "37-806", "faculty": "9R846", "type": "class" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Tuesday": [
+    { "time": "9:00-10:00", "subject": "INT222 (P)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "10:00-11:00", "subject": "INT222 (P)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "12:00-1:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "2:00-3:00", "subject": "PEV301 (L)", "room": "36-909", "faculty": "K23EU", "type": "class" },
+    { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Wednesday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "10:00-11:00", "subject": "INT252 (L)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT252 (L)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "12:00-1:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "1:00-2:00", "subject": "PSY291 (L)", "room": "37-908", "faculty": "KO106", "type": "class" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ],
+  "Thursday": [
+    { "time": "9:00-10:00", "subject": "INT222 (L)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "10:00-11:00", "subject": "INT222 (L)", "room": "34-506X", "faculty": "K23EU", "type": "class" },
+    { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "12:00-1:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "1.00-2:00", "subject": "PSY291 (L)", "room": "37-908", "faculty": "KO106", "type": "class" },
+    { "time": "2:00-3:00", "subject": "PEV301 (L)", "room": "34-603", "faculty": "K23EU", "type": "class" }
+  ],
+  "Friday": [
+    { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "10:00-11:00", "subject": "INT252 (P)", "room": "34-603", "faculty": "K23EU", "type": "class" },
+    { "time": "11:00-12:00", "subject": "INT252 (P)", "room": "34-603", "faculty": "K23EU", "type": "class" },
+    { "time": "12:00-1:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+    { "time": "1:00-2:00", "subject": "PSY291 (L)", "room": "37-908", "faculty": "KO106", "type": "class" },
+    { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+  ]
+},
   };
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   const friends = Object.keys(timetable);
+
+  // Normalize timetable: ensure every friend has the same number of slots per day
+  // as the first friend (used as the reference for table rows). Missing slots
+  // are filled with a harmless 'Free' placeholder so columns render consistently.
+  if (friends.length > 0) {
+    const reference = timetable[friends[0]];
+    days.forEach(day => {
+      const refSlots = (reference && reference[day]) ? reference[day].map(s => s.time) : [];
+      friends.forEach(friend => {
+        if (!timetable[friend]) timetable[friend] = {};
+        if (!timetable[friend][day]) timetable[friend][day] = [];
+        for (let i = 0; i < refSlots.length; i++) {
+          if (!timetable[friend][day][i]) {
+            timetable[friend][day][i] = {
+              time: refSlots[i] || '',
+              subject: 'Free',
+              room: '',
+              faculty: '',
+              type: 'free'
+            };
+          }
+        }
+      });
+    });
+  }
+
+  // Function to mark a slot as free/unavailable
+  const toggleSlotAsFree = (friendName, day, timeSlot) => {
+    const key = `${friendName}-${day}-${timeSlot}`;
+    const wasMarked = markedFreeSlots[key];
+    
+    setMarkedFreeSlots(prev => {
+      const newState = { ...prev };
+      if (newState[key]) {
+        delete newState[key];
+      } else {
+        newState[key] = true;
+      }
+      localStorage.setItem('markedFreeSlots', JSON.stringify(newState));
+      return newState;
+    });
+
+    // Send notifications
+    const action = wasMarked ? 'marked as available' : 'marked as unavailable';
+    const notificationTitle = `${friendName} ${action} for ${timeSlot}`;
+    const notificationBody = wasMarked 
+      ? `🎉 ${friendName} is now available during ${timeSlot} on ${day}!`
+      : `🚫 ${friendName} is now unavailable during ${timeSlot} on ${day}`;
+    
+    sendNotification(notificationTitle, notificationBody);
+    
+    // Send chat notification
+    const chatMessage = wasMarked 
+      ? `🎉 ${friendName} is now available during ${timeSlot} on ${day}!`
+      : `🚫 ${friendName} marked themselves as unavailable during ${timeSlot} on ${day}`;
+    sendChatNotification(chatMessage);
+  };
+
+  // Function to check if a slot is marked as free
+  const isSlotMarkedAsFree = (friendName, day, timeSlot) => {
+    const key = `${friendName}-${day}-${timeSlot}`;
+    return markedFreeSlots[key] || false;
+  };
+
+  // Function to mark a class slot as cancelled/free
+  const toggleClassAsCancelled = (friendName, day, timeSlot) => {
+    const key = `${friendName}-${day}-${timeSlot}`;
+    const wasCancelled = cancelledClassSlots[key];
+    
+    setCancelledClassSlots(prev => {
+      const newState = { ...prev };
+      if (newState[key]) {
+        delete newState[key];
+      } else {
+        newState[key] = true;
+      }
+      localStorage.setItem('cancelledClassSlots', JSON.stringify(newState));
+      return newState;
+    });
+
+    // Send notifications
+    const action = wasCancelled ? 'class restored' : 'class cancelled';
+    const notificationTitle = `${friendName}'s ${action} for ${timeSlot}`;
+    const notificationBody = wasCancelled 
+      ? `📚 ${friendName}'s class is back on during ${timeSlot} on ${day}`
+      : `🎉 ${friendName}'s class was cancelled during ${timeSlot} on ${day} - they're free!`;
+    
+    sendNotification(notificationTitle, notificationBody);
+    
+    // Send chat notification
+    const chatMessage = wasCancelled 
+      ? `📚 ${friendName}'s class is back on during ${timeSlot} on ${day}`
+      : `🎉 ${friendName}'s class was cancelled during ${timeSlot} on ${day} - they're free!`;
+    sendChatNotification(chatMessage);
+  };
+
+  // Function to check if a class slot is marked as cancelled
+  const isClassSlotCancelled = (friendName, day, timeSlot) => {
+    const key = `${friendName}-${day}-${timeSlot}`;
+    return cancelledClassSlots[key] || false;
+  };
 
   // Function to check if a friend is currently available
   const isAvailableNow = (friendName) => {
@@ -390,10 +547,15 @@ const App = () => {
       const endTimeInMin = endHour * 60 + endMin;
       
       if (currentTimeInMin >= startTimeInMin && currentTimeInMin < endTimeInMin) {
+        // Check if slot is marked as free by user
+        const isMarkedFree = isSlotMarkedAsFree(friendName, currentDayName, slot.time);
+        // Check if class is cancelled
+        const isClassCancelled = isClassSlotCancelled(friendName, currentDayName, slot.time);
+        
         return {
-          available: slot.type === 'free' || slot.type === 'break',
-          status: slot.subject,
-          type: slot.type
+          available: (slot.type === 'free' || slot.type === 'break' || isClassCancelled) && !isMarkedFree,
+          status: isMarkedFree ? 'Marked as Unavailable' : isClassCancelled ? 'Class Cancelled - Free!' : slot.subject,
+          type: isMarkedFree ? 'marked-unavailable' : isClassCancelled ? 'cancelled-class' : slot.type
         };
       }
     }
@@ -409,7 +571,9 @@ const App = () => {
     timeSlots.forEach(timeSlot => {
       const availableFriends = friends.filter(friend => {
         const slot = timetable[friend][day].find(s => s.time === timeSlot);
-        return slot && (slot.type === 'free' || slot.type === 'break');
+        const isMarkedUnavailable = isSlotMarkedAsFree(friend, day, timeSlot);
+        const isClassCancelled = isClassSlotCancelled(friend, day, timeSlot);
+        return slot && (slot.type === 'free' || slot.type === 'break' || isClassCancelled) && !isMarkedUnavailable;
       });
       
       if (availableFriends.length >= 2) {
@@ -550,39 +714,39 @@ const App = () => {
       
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
-          style={{ 
-            background: theme.cardBackground,
-            borderColor: theme.borderColor,
-            backdropFilter: theme.glassEffect
-          }}>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="rounded-3xl md:rounded-[2rem] shadow-2xl p-6 md:p-10 border-4 border-yellow-300 bg-gradient-to-br from-pink-200 via-purple-200 to-blue-200 relative overflow-hidden">
+          {/* Cartoon background elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-300 rounded-full opacity-20 transform translate-x-8 -translate-y-8"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-pink-300 rounded-full opacity-20 transform -translate-x-4 translate-y-4"></div>
+          <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-green-300 rounded-full opacity-30"></div>
+          
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
             <div>
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-2"
-                style={{ color: theme.primaryText }}>
-                Friends Timetable 📚
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-black mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 transform hover:scale-105 transition-transform duration-300">
+                👫 Besties Schedule 🎉
               </h1>
-              <p className="text-sm md:text-xl font-medium"
-                style={{ color: theme.secondaryText }}>
-                Track your squad's schedule in real-time! ⏰
+              <p className="text-lg md:text-2xl font-bold text-purple-800 flex items-center gap-2">
+                <span className="text-2xl md:text-3xl">🌈</span>
+                Let's sync our awesome schedules together! 
+                <span className="text-2xl md:text-3xl">✨</span>
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-3">
-                <div className="px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl md:rounded-2xl font-bold shadow-lg text-sm md:text-base">
-                  <span className="mr-2">{friendInfo[currentUser]?.emoji}</span>
-                  Welcome, {currentUser}!
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+              <div className="flex items-center gap-4">
+                <div className="px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white rounded-2xl md:rounded-3xl font-black shadow-2xl text-base md:text-lg transform hover:scale-110 transition-all duration-300 border-4 border-white">
+                  <span className="mr-2 text-2xl md:text-3xl">{friendInfo[currentUser]?.emoji}</span>
+                  Hey {currentUser}! 🎊
                 </div>
                 
                 {/* Message Icon with Badge */}
                 <button
                   onClick={scrollToChat}
-                  className="relative px-3 md:px-4 py-2 md:py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl md:rounded-2xl font-bold shadow-lg transition-all hover:scale-105 active:scale-95"
-                  title="Go to messages"
+                  className="relative px-4 md:px-6 py-3 md:py-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white rounded-2xl md:rounded-3xl font-black shadow-2xl transition-all hover:scale-110 active:scale-95 border-4 border-white"
+                  title="Chat with your besties!"
                 >
-                  <span className="text-xl md:text-2xl">💬</span>
+                  <span className="text-2xl md:text-3xl">💬</span>
                   {unreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 border-2 border-white shadow-lg animate-pulse">
+                    <span className="absolute -top-3 -right-3 bg-red-500 text-white text-sm font-black rounded-full min-w-[28px] h-7 flex items-center justify-center px-2 border-4 border-white shadow-xl animate-bounce">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -591,76 +755,124 @@ const App = () => {
               
               <button
                 onClick={handleLogout}
-                className="px-4 md:px-6 py-2 md:py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl md:rounded-2xl font-bold transition-colors shadow-lg text-sm md:text-base w-full sm:w-auto"
+                className="px-6 md:px-8 py-3 md:py-4 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white rounded-2xl md:rounded-3xl font-black transition-all shadow-2xl text-base md:text-lg w-full sm:w-auto border-4 border-white hover:scale-105 active:scale-95"
               >
-                🚪 Logout
+                👋 See ya later!
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Notification Status Banner */}
+      {notificationPermission === 'granted' && notificationsEnabled && (
+        <div className="max-w-7xl mx-auto mb-4">
+          <div className="bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400 rounded-3xl md:rounded-[2rem] shadow-2xl p-4 md:p-6 border-4 border-yellow-300 relative overflow-hidden">
+            {/* Cartoon elements */}
+            <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-300 rounded-full opacity-30 transform translate-x-4 -translate-y-4"></div>
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-pink-300 rounded-full opacity-30 transform -translate-x-2 translate-y-2"></div>
+            
+            <div className="flex items-center justify-center gap-3 md:gap-4 relative z-10">
+              <span className="text-3xl md:text-4xl animate-bounce">🔔</span>
+              <p className="text-white font-black text-base md:text-xl text-center">
+                🎉 Yay! We'll ping you when your besties change their plans! 🎉
+              </p>
+              <span className="text-3xl md:text-4xl animate-bounce">📱</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Live Clock */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border-4 border-white">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 rounded-3xl md:rounded-[2rem] shadow-2xl p-6 md:p-8 border-4 border-yellow-300 relative overflow-hidden">
+          {/* Cartoon background elements */}
+          <div className="absolute top-0 left-0 w-24 h-24 bg-yellow-300 rounded-full opacity-20 transform -translate-x-4 -translate-y-4"></div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-pink-300 rounded-full opacity-20 transform translate-x-8 translate-y-8"></div>
+          <div className="absolute top-1/2 left-1/3 w-16 h-16 bg-green-300 rounded-full opacity-30"></div>
+          
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
             <div className="text-center md:text-left">
-              <p className="text-white text-sm md:text-xl font-bold mb-1 md:mb-2 opacity-90">Current Time</p>
-              <p className="text-white text-3xl md:text-5xl font-bold tracking-wider">
+              <p className="text-white text-lg md:text-2xl font-black mb-2 md:mb-3 flex items-center gap-2">
+                <span className="text-2xl md:text-3xl">🕐</span>
+                What time is it? It's...
+              </p>
+              <p className="text-white text-4xl md:text-6xl font-black tracking-wider transform hover:scale-105 transition-transform duration-300">
                 {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </p>
-              <p className="text-purple-100 mt-1 md:mt-2 text-sm md:text-lg font-medium">
+              <p className="text-yellow-100 mt-2 md:mt-3 text-base md:text-xl font-bold flex items-center gap-2">
+                <span className="text-xl md:text-2xl">📅</span>
                 {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <div className="text-6xl md:text-8xl">⏰</div>
+            <div className="text-8xl md:text-9xl animate-pulse">⏰</div>
           </div>
         </div>
       </div>
 
       {/* Current Availability */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
-          style={{ 
-            background: theme.cardBackground,
-            borderColor: theme.borderColor,
-            backdropFilter: theme.glassEffect
-          }}>
-          <h2 className="text-2xl md:text-4xl font-bold mb-4 md:mb-6 flex items-center gap-2 md:gap-3"
-            style={{ color: theme.primaryText }}>
-            <span className="text-2xl md:text-4xl">👥</span>
-            Friend Status Right Now
+        <div className="rounded-3xl md:rounded-[2rem] shadow-2xl p-6 md:p-10 border-4 border-pink-300 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 relative overflow-hidden">
+          {/* Cartoon background elements */}
+          <div className="absolute top-0 right-0 w-28 h-28 bg-yellow-300 rounded-full opacity-20 transform translate-x-6 -translate-y-6"></div>
+          <div className="absolute bottom-0 left-0 w-20 h-20 bg-green-300 rounded-full opacity-20 transform -translate-x-3 translate-y-3"></div>
+          <div className="absolute top-1/3 left-1/4 w-12 h-12 bg-pink-300 rounded-full opacity-30"></div>
+          
+          <h2 className="text-3xl md:text-5xl font-black mb-6 md:mb-8 flex items-center gap-3 md:gap-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 relative z-10">
+            <span className="text-4xl md:text-6xl animate-bounce">👥</span>
+            Where are my besties right now? 🤔
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 relative z-10">
             {friends.map(friend => {
               const status = isAvailableNow(friend);
               return (
                 <div
                   key={friend}
-                  className={`p-4 md:p-6 rounded-xl md:rounded-2xl border-2 md:border-4 ${
+                  className={`p-6 md:p-8 rounded-2xl md:rounded-3xl border-4 shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 ${
                     status.available 
-                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300' 
-                      : 'bg-gradient-to-br from-red-50 to-orange-50 border-red-300'
-                  } shadow-lg hover:shadow-xl transition-shadow`}
+                      ? 'bg-gradient-to-br from-green-200 via-emerald-200 to-teal-200 border-green-400' 
+                      : 'bg-gradient-to-br from-red-200 via-orange-200 to-pink-200 border-red-400'
+                  } relative overflow-hidden`}
                 >
-                  <div className="flex items-center justify-between mb-2 md:mb-3">
-                    <h3 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
-                      <span className="text-2xl md:text-3xl">{friendInfo[friend].emoji}</span>
+                  {/* Cartoon background elements */}
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-300 rounded-full opacity-20 transform translate-x-4 -translate-y-4"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 bg-pink-300 rounded-full opacity-20 transform -translate-x-2 translate-y-2"></div>
+                  
+                  <div className="flex items-center justify-between mb-4 md:mb-6 relative z-10">
+                    <h3 className="text-2xl md:text-3xl font-black text-gray-800 flex items-center gap-3">
+                      <span className="text-3xl md:text-4xl animate-pulse">{friendInfo[friend].emoji}</span>
                       {friend}
                     </h3>
-                    <span className={`px-3 py-1 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-bold ${
+                    <span className={`px-4 py-2 md:px-6 md:py-3 rounded-2xl text-sm md:text-base font-black border-2 border-white shadow-lg ${
                       status.available ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
                     }`}>
-                      {status.available ? '✅ Free' : '❌ Busy'}
+                      {status.available ? '🎉 FREE!' : '😴 BUSY'}
                     </span>
                   </div>
-                  <p className="text-gray-700 font-medium text-sm md:text-lg">
-                    <strong>Currently:</strong> {status.status}
+                  <p className="text-gray-800 font-bold text-base md:text-lg mb-3">
+                    <span className="text-lg md:text-xl">📝</span> <strong>Right now:</strong> {status.status}
                   </p>
                   {status.available && (
-                    <div className="mt-2 md:mt-3 p-2 md:p-3 bg-green-100 rounded-lg border-2 border-green-300">
-                      <p className="text-green-800 font-bold text-xs md:text-sm">
-                        🎉 Available for a chat or hangout!
+                    <div className="mt-3 md:mt-4 p-3 md:p-4 bg-gradient-to-r from-green-300 to-emerald-300 rounded-2xl border-4 border-green-500 shadow-lg">
+                      <p className="text-green-900 font-black text-sm md:text-base flex items-center gap-2">
+                        <span className="text-lg md:text-xl animate-bounce">🎉</span>
+                        Perfect time to hang out with {friend}! Let's chat! 💬
+                      </p>
+                    </div>
+                  )}
+                  {status.type === 'marked-unavailable' && (
+                    <div className="mt-3 md:mt-4 p-3 md:p-4 bg-gradient-to-r from-red-300 to-pink-300 rounded-2xl border-4 border-red-500 shadow-lg">
+                      <p className="text-red-900 font-black text-sm md:text-base flex items-center gap-2">
+                        <span className="text-lg md:text-xl">😴</span>
+                        {friend} is taking a break right now - maybe later! 
+                      </p>
+                    </div>
+                  )}
+                  {status.type === 'cancelled-class' && (
+                    <div className="mt-3 md:mt-4 p-3 md:p-4 bg-gradient-to-r from-yellow-300 to-orange-300 rounded-2xl border-4 border-yellow-500 shadow-lg">
+                      <p className="text-yellow-900 font-black text-sm md:text-base flex items-center gap-2">
+                        <span className="text-lg md:text-xl animate-bounce">🎉</span>
+                        Awesome! {friend}'s class got cancelled - they're free to hang out! 
                       </p>
                     </div>
                   )}
@@ -677,24 +889,30 @@ const App = () => {
         if (nextFreeTime) {
           return (
             <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-              <div className="bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border-4 border-white">
-                <h2 className="text-xl md:text-3xl font-bold mb-2 md:mb-4 text-white flex items-center gap-2 md:gap-3">
-                  <span className="text-2xl md:text-4xl">🎯</span>
-                  Next Hangout Time
+              <div className="bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400 rounded-3xl md:rounded-[2rem] shadow-2xl p-6 md:p-8 border-4 border-yellow-300 relative overflow-hidden">
+                {/* Cartoon background elements */}
+                <div className="absolute top-0 left-0 w-20 h-20 bg-pink-300 rounded-full opacity-20 transform -translate-x-4 -translate-y-4"></div>
+                <div className="absolute bottom-0 right-0 w-24 h-24 bg-green-300 rounded-full opacity-20 transform translate-x-6 translate-y-6"></div>
+                <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-blue-300 rounded-full opacity-30"></div>
+                
+                <h2 className="text-2xl md:text-4xl font-black mb-4 md:mb-6 text-white flex items-center gap-3 md:gap-4 relative z-10">
+                  <span className="text-3xl md:text-5xl animate-bounce">🎯</span>
+                  When can we all hang out? 🤔
                 </h2>
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-6 bg-white/20 backdrop-blur-sm rounded-xl md:rounded-2xl p-3 md:p-4 border-2 border-white/30">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6 bg-white/30 backdrop-blur-sm rounded-2xl md:rounded-3xl p-4 md:p-6 border-4 border-white/50 shadow-xl relative z-10">
                   <div className="flex-1">
-                    <p className="text-white text-lg md:text-2xl font-bold">
+                    <p className="text-white text-xl md:text-3xl font-black mb-2">
                       {nextFreeTime.day} at {nextFreeTime.time}
                     </p>
-                    <p className="text-yellow-100 text-xs md:text-sm mt-1">
-                      All friends are free! Perfect time to hang out! 🎉
+                    <p className="text-yellow-100 text-base md:text-lg font-bold flex items-center gap-2">
+                      <span className="text-lg md:text-xl animate-bounce">🎉</span>
+                      Everyone's free! Let's plan something awesome! 🚀
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     {nextFreeTime.friends.map(friend => (
-                      <div key={friend} className="px-3 py-1 md:px-4 md:py-2 bg-white/30 backdrop-blur-sm rounded-lg border-2 border-white/50 text-white font-bold text-xs md:text-sm">
-                        {friendInfo[friend].emoji} {friend}
+                      <div key={friend} className="px-4 py-2 md:px-6 md:py-3 bg-white/40 backdrop-blur-sm rounded-2xl border-4 border-white/60 text-white font-black text-sm md:text-base shadow-lg transform hover:scale-105 transition-transform">
+                        <span className="text-lg md:text-xl">{friendInfo[friend].emoji}</span> {friend}
                       </div>
                     ))}
                   </div>
@@ -708,6 +926,36 @@ const App = () => {
 
       {/* Day Selector */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
+        <div className="rounded-3xl md:rounded-[2rem] shadow-2xl p-6 md:p-8 border-4 border-blue-300 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 relative overflow-hidden">
+          {/* Cartoon background elements */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-300 rounded-full opacity-20 transform translate-x-4 -translate-y-4"></div>
+          <div className="absolute bottom-0 left-0 w-20 h-20 bg-green-300 rounded-full opacity-20 transform -translate-x-3 translate-y-3"></div>
+          <div className="absolute top-1/2 left-1/3 w-14 h-14 bg-pink-300 rounded-full opacity-30"></div>
+          
+          <h2 className="text-2xl md:text-4xl font-black mb-4 md:mb-6 flex items-center gap-3 md:gap-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 relative z-10">
+            <span className="text-3xl md:text-5xl animate-bounce">📅</span>
+            Pick a day to check out! 🗓️
+          </h2>
+          <div className="flex flex-wrap gap-3 md:gap-4 relative z-10">
+            {days.map(day => (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`px-6 py-3 md:px-8 md:py-4 rounded-2xl md:rounded-3xl font-black transition-all text-base md:text-lg border-4 shadow-xl transform hover:scale-110 active:scale-95 ${
+                  selectedDay === day
+                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white border-white shadow-2xl scale-105'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mark Slots as Free Instructions */}
+      <div className="max-w-7xl mx-auto mb-4 md:mb-8">
         <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border" 
           style={{ 
             background: theme.cardBackground,
@@ -716,24 +964,99 @@ const App = () => {
           }}>
           <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 flex items-center gap-2"
             style={{ color: theme.primaryText }}>
-            <span className="text-2xl md:text-3xl">📅</span>
-            Select Day
+            <span className="text-2xl md:text-3xl">⚙️</span>
+            Mark Your Availability
           </h2>
-          <div className="flex flex-wrap gap-2 md:gap-3">
-            {days.map(day => (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl font-bold transition-all text-sm md:text-base ${
-                  selectedDay === day
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {day}
-              </button>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-3 md:p-4 bg-blue-50 border-2 border-blue-300 rounded-xl">
+              <h3 className="font-bold text-blue-800 text-sm md:text-base mb-2 flex items-center gap-2">
+                <span>✅</span> Mark Free Slots
+              </h3>
+              <p className="text-blue-700 text-xs md:text-sm">
+                Click ✅ next to your free slots to mark them as unavailable when you're busy.
+              </p>
+            </div>
+            <div className="p-3 md:p-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
+              <h3 className="font-bold text-yellow-800 text-sm md:text-base mb-2 flex items-center gap-2">
+                <span>📚</span> Cancel Classes
+              </h3>
+              <p className="text-yellow-700 text-xs md:text-sm">
+                Click ❌ next to your class slots when classes get cancelled to mark them as free time.
+              </p>
+            </div>
+            <div className="p-3 md:p-4 bg-green-50 border-2 border-green-300 rounded-xl">
+              <h3 className="font-bold text-green-800 text-sm md:text-base mb-2 flex items-center gap-2">
+                <span>🔄</span> Toggle Status
+              </h3>
+              <p className="text-green-700 text-xs md:text-sm">
+                Click buttons to toggle between available/unavailable or active/cancelled. Changes save automatically!
+              </p>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Notification Settings */}
+      <div className="max-w-7xl mx-auto mb-4 md:mb-8">
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-6 border" 
+          style={{ 
+            background: theme.cardBackground,
+            borderColor: theme.borderColor,
+            backdropFilter: theme.glassEffect
+          }}>
+          <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 flex items-center gap-2"
+            style={{ color: theme.primaryText }}>
+            <span className="text-2xl md:text-3xl">🔔</span>
+            Notification Settings
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-3 md:p-4 bg-blue-50 border-2 border-blue-300 rounded-xl">
+              <h3 className="font-bold text-blue-800 text-sm md:text-base mb-2 flex items-center gap-2">
+                <span>📱</span> Phone Notifications
+              </h3>
+              <div className="flex items-center justify-between">
+                <p className="text-blue-700 text-xs md:text-sm">
+                  Get notified when friends change their availability
+                </p>
+                <button
+                  onClick={() => {
+                    setNotificationsEnabled(!notificationsEnabled);
+                    localStorage.setItem('notificationsEnabled', JSON.stringify(!notificationsEnabled));
+                  }}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                    notificationsEnabled 
+                      ? 'bg-green-500 text-white hover:bg-green-600' 
+                      : 'bg-gray-400 text-white hover:bg-gray-500'
+                  }`}
+                >
+                  {notificationsEnabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+            <div className="p-3 md:p-4 bg-purple-50 border-2 border-purple-300 rounded-xl">
+              <h3 className="font-bold text-purple-800 text-sm md:text-base mb-2 flex items-center gap-2">
+                <span>💬</span> Chat Notifications
+              </h3>
+              <div className="flex items-center justify-between">
+                <p className="text-purple-700 text-xs md:text-sm">
+                  Changes are automatically posted in group chat
+                </p>
+                <span className="px-3 py-1 bg-purple-500 text-white rounded-full text-xs font-bold">
+                  AUTO
+                </span>
+              </div>
+            </div>
+          </div>
+          {notificationPermission === 'denied' && (
+            <div className="mt-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl">
+              <p className="text-red-800 font-bold text-sm flex items-center gap-2">
+                <span>⚠️</span> Notifications blocked by browser
+              </p>
+              <p className="text-red-700 text-xs mt-1">
+                Please enable notifications in your browser settings to get updates about timetable changes.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -799,7 +1122,7 @@ const App = () => {
 
       {/* Timetable Grid */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8">
-        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border" 
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl p-4 md:p-8 border cartoon-timetable-wrapper" 
           style={{ 
             background: theme.cardBackground,
             borderColor: theme.borderColor,
@@ -812,7 +1135,7 @@ const App = () => {
           </h2>
           
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse cartoon-timetable">
               <thead>
                 <tr>
                   <th className="border-2 md:border-4 border-purple-300 bg-gradient-to-r from-purple-400 to-pink-400 p-2 md:p-4 text-white font-bold text-xs md:text-lg">
@@ -839,17 +1162,96 @@ const App = () => {
                       {timetable[friends[0]][selectedDay][index].time}
                     </td>
                     {friends.map(friend => {
-                      const slot = timetable[friend][selectedDay][index];
+                      const slotArray = timetable[friend] && timetable[friend][selectedDay];
+                      const slot = slotArray ? slotArray[index] : undefined;
+
+                      // If slot data is missing for this friend/time, render a placeholder cell
+                      if (!slot) {
+                        return (
+                          <td
+                            key={friend}
+                            className={`border-2 md:border-4 border-purple-200 p-2 md:p-3 text-xs md:text-base font-medium bg-gray-50 text-gray-400`}
+                          >
+                            <span className="emoji-sticker">{friendInfo[friend].emoji}</span>
+                            <div className="flex items-center justify-center">
+                              <span className="italic">No schedule</span>
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      const isMarkedUnavailable = isSlotMarkedAsFree(friend, selectedDay, slot.time);
+                      const isClassCancelled = isClassSlotCancelled(friend, selectedDay, slot.time);
+                      const isCurrentUser = friend === currentUser;
+                      
                       return (
                         <td
                           key={friend}
                           className={`border-2 md:border-4 border-purple-200 p-2 md:p-3 text-xs md:text-base font-medium ${
-                            slot.type === 'class'
+                            isMarkedUnavailable
+                              ? 'bg-red-100 text-red-800'
+                              : isClassCancelled
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : slot.type === 'class'
                               ? 'bg-blue-100 text-blue-800'
                               : 'bg-green-100 text-green-800'
                           }`}
                         >
-                          {slot.subject}
+                          <span className="emoji-sticker">{friendInfo[friend].emoji}</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className={isMarkedUnavailable ? 'line-through opacity-70' : ''}>
+                                {isMarkedUnavailable ? 'Unavailable' : isClassCancelled ? 'Class Cancelled' : slot.subject}
+                              </span>
+                              {isCurrentUser && (
+                                <>
+                                  {(slot.type === 'free' || slot.type === 'break') && (
+                                    <button
+                                      onClick={() => toggleSlotAsFree(friend, selectedDay, slot.time)}
+                                      className={`ml-2 px-2 py-1 text-xs rounded-full font-bold transition-all ${
+                                        isMarkedUnavailable
+                                          ? 'bg-red-500 text-white hover:bg-red-600'
+                                          : 'bg-green-500 text-white hover:bg-green-600'
+                                      }`}
+                                      title={isMarkedUnavailable ? 'Mark as Available' : 'Mark as Unavailable'}
+                                    >
+                                      {isMarkedUnavailable ? '❌' : '✅'}
+                                    </button>
+                                  )}
+                                  {slot.type === 'class' && (
+                                    <button
+                                      onClick={() => toggleClassAsCancelled(friend, selectedDay, slot.time)}
+                                      className={`ml-2 px-2 py-1 text-xs rounded-full font-bold transition-all ${
+                                        isClassCancelled
+                                          ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                                      }`}
+                                      title={isClassCancelled ? 'Mark Class as Active' : 'Mark Class as Cancelled'}
+                                    >
+                                      {isClassCancelled ? '📚' : '❌'}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                            {/* Show room and optional faculty below the subject when available */}
+                            {slot.room && (
+                              <div className="text-xs text-gray-600">
+                                <strong>Room:</strong> {slot.room}{slot.faculty ? ` • ${slot.faculty}` : ''}
+                              </div>
+                            )}
+
+                            {isMarkedUnavailable && (
+                              <div className="text-xs text-red-600 font-bold">
+                                🚫 Marked as unavailable
+                              </div>
+                            )}
+                            {isClassCancelled && (
+                              <div className="text-xs text-yellow-600 font-bold">
+                                🎉 Class cancelled - you're free!
+                              </div>
+                            )}
+                          </div>
                         </td>
                       );
                     })}
@@ -863,7 +1265,7 @@ const App = () => {
 
       {/* GetStream Chat Section */}
       <div className="max-w-7xl mx-auto mb-4 md:mb-8" id="chatSection">
-        <div className="rounded-2xl md:rounded-3xl shadow-2xl border overflow-hidden" 
+        <div className="rounded-2xl md:rounded-3xl shadow-2xl border overflow-hidden cartoon-chat-wrapper" 
           style={{ 
             background: theme.cardBackground,
             borderColor: theme.borderColor,
