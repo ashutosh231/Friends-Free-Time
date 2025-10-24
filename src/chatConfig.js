@@ -18,9 +18,18 @@ export const chatUsers = {
     emoji: '🤩',
     password: 'dhruv123',
     image: 'https://ui-avatars.com/api/?name=Dhruv&background=ec4899&color=fff&size=128'
+  },
+  'shobheet': {
+    id: 'shobheet',
+    name: 'Shobheet',
+    emoji: '🎯',
+    password: 'shobheet123',
+    image: 'https://ui-avatars.com/api/?name=Shobheet&background=6366f1&color=fff&size=128'
   }
 };
 
 // Channel configuration
-export const CHANNEL_ID = 'friends-timetable-chat';
+// Note: If you add new members and get permission errors, increment the version number
+// This creates a fresh channel with all members included
+export const CHANNEL_ID = 'friends-timetable-chat-v3';
 export const CHANNEL_NAME = 'Friends Timetable Group Chat';

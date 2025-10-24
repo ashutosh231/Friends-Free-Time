@@ -59,7 +59,8 @@ const App = () => {
   // Fixed credentials for users
   const users = {
     'ashutosh': { password: 'ashu123', name: 'Ashutosh', emoji: '😊' },
-    'dhruv': { password: 'dhruv123', name: 'Dhruv', emoji: '🤩' }
+    'dhruv': { password: 'dhruv123', name: 'Dhruv', emoji: '🤩' },
+    'shobheet': { password: 'shobheet123', name: 'Shobheet', emoji: '🎯' }
   };
 
   // Check if user is already logged in
@@ -135,8 +136,10 @@ const App = () => {
   useEffect(() => {
     if (showChat && channel) {
       setUnreadCount(0);
-      // Mark all messages as read
-      channel.markRead().catch(console.error);
+      // Mark all messages as read (only if channel is initialized)
+      if (channel.initialized) {
+        channel.markRead().catch(console.error);
+      }
     }
   }, [showChat, channel]);
 
@@ -214,13 +217,18 @@ const App = () => {
       }
 
       // Create or get the channel
+      // For existing channels, we need to ensure all members are added
+      const allMembers = ['ashutosh', 'dhruv', 'shobheet'];
+      
       const channelInstance = chatClient.channel('messaging', CHANNEL_ID, {
         name: CHANNEL_NAME,
-        members: ['ashutosh', 'dhruv'],
+        members: allMembers,
         image: 'https://ui-avatars.com/api/?name=Friends&background=a855f7&color=fff&size=128',
       });
 
+      // Watch the channel to initialize it properly
       await channelInstance.watch();
+      
       setChannel(channelInstance);
       
       // Get initial unread count
@@ -323,6 +331,12 @@ const App = () => {
       lastSeen: 'Online',
       mood: 'Excited',
       emoji: '🤩'
+    },
+    'Shobheet': {
+      status: 'Active',
+      lastSeen: 'Online',
+      mood: 'Focused',
+      emoji: '🎯'
     }
   };
 
@@ -420,6 +434,59 @@ const App = () => {
     { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
   ]
 },
+
+    "Shobheet": {
+      "Monday": [
+        { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "10:00-11:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "12:00-1:00", "subject": "INT344 (P)", "room": "36-802A", "faculty": "K23RT", "type": "class" },
+        { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "4:00-5:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+      ],
+      "Tuesday": [
+        { "time": "9:00-10:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "10:00-11:00", "subject": "INT344 (L)", "room": "37-805", "faculty": "K23RT", "type": "class" },
+        { "time": "11:00-12:00", "subject": "INT344 (L)", "room": "37-805", "faculty": "K23RT", "type": "class" },
+        { "time": "12:00-1:00", "subject": "INT346 (L)", "room": "37-906", "faculty": "KO116", "type": "class" },
+        { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "4:00-5:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+      ],
+      "Wednesday": [
+        { "time": "9:00-10:00", "subject": "INT423 (L)", "room": "33-610", "faculty": "K23RT", "type": "class" },
+        { "time": "10:00-11:00", "subject": "INT423 (L)", "room": "33-610", "faculty": "K23RT", "type": "class" },
+        { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "12:00-1:00", "subject": "INT346 (L)", "room": "36-804", "faculty": "KO116", "type": "class" },
+        { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "4:00-5:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+      ],
+      "Thursday": [
+        { "time": "9:00-10:00", "subject": "INT423 (P)", "room": "36-502", "faculty": "K23RT", "type": "class" },
+        { "time": "10:00-11:00", "subject": "INT423 (P)", "room": "36-502", "faculty": "K23RT", "type": "class" },
+        { "time": "11:00-12:00", "subject": "PEV301 (L)", "room": "36-502", "faculty": "K23RT", "type": "class" },
+        { "time": "12:00-1:00", "subject": "INT346 (P)", "room": "36-804", "faculty": "KO116", "type": "class" },
+        { "time": "1:00-2:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "2:00-3:00", "subject": "PEV301 (T)", "room": "37-705", "faculty": "K23RT", "type": "class" },
+        { "time": "3:00-4:00", "subject": "PEV301 (T)", "room": "37-705", "faculty": "K23RT", "type": "class" },
+        { "time": "4:00-5:00", "subject": "PEAS05 (L)", "room": "34-703", "faculty": "9R830", "type": "class" }
+      ],
+      "Friday": [
+        { "time": "9:00-10:00", "subject": "PEV301 (L)", "room": "37-801", "faculty": "K23RT", "type": "class" },
+        { "time": "10:00-11:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "11:00-12:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "12:00-1:00", "subject": "INT346 (P)", "room": "37-910", "faculty": "KO116", "type": "class" },
+        { "time": "1:00-2:00", "subject": "PEAS05 (L)", "room": "34-707", "faculty": "9R830", "type": "class" },
+        { "time": "2:00-3:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "3:00-4:00", "subject": "Free", "room": "", "faculty": "", "type": "free" },
+        { "time": "4:00-5:00", "subject": "Free", "room": "", "faculty": "", "type": "free" }
+      ]
+    }
   };
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -689,7 +756,7 @@ const App = () => {
             <div className="mt-8 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl">
               <p className="text-sm text-blue-800 font-medium text-center">
                 <strong>Demo Credentials:</strong><br />
-                ashutosh / ashu123 or dhruv / dhruv123
+                ashutosh / ashu123 or dhruv / dhruv123 or shobheet / shobheet123
               </p>
             </div>
           </div>
